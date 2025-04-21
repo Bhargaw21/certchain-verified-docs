@@ -56,9 +56,9 @@ const RegisterPage = () => {
       await register(values.name, values.email, values.password);
       toast({
         title: "Registration Successful",
-        description: "Please check your email for a verification link to complete your registration.",
+        description: "Your account has been created and you are now logged in.",
       });
-      navigate("/login");
+      navigate("/");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);

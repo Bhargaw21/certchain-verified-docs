@@ -11,7 +11,6 @@ interface Profile {
   role: 'admin' | 'user';
 }
 
-// Create and export the context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -31,7 +30,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Listen to authentication state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         fetchProfile(session.user.id).then((profile) => {
@@ -49,8 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setIsLoading(false);
     });
-
-    // Initial session setup
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         fetchProfile(session.user.id).then((profile) => {
@@ -79,21 +75,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      
+
       if (error) {
-        if (error.message.includes('Email not confirmed')) {
-          throw new Error('Please confirm your email address before logging in. Check your inbox for a confirmation link.');
-        } else if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123');
-        } else {
-          throw new Error(error.message || 'Login failed');
-        }
+        throw new Error("Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123");
       }
-      
-      // If we have a successful login but no data, something went wrong
-      if (!data.user) {
-        throw new Error('Failed to retrieve user information');
-      }
+      if (!data.user) throw new Error('Failed to retrieve user information');
 
       toast({
         title: "Login successful",
@@ -101,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (error) {
       setIsLoading(false);
-      throw error; // Propagate error to the component for display
+      throw error;
     }
     setIsLoading(false);
   };
@@ -118,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  // Register method using Supabase (sign-up and create profile)
+  // Register method: create user, skip email verification, log in immediately
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
@@ -127,23 +113,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password,
         options: { data: { name } }
       });
-      
       if (error) {
         throw new Error(error.message || 'Registration failed');
       }
-      
-      // Check if email confirmation is required
-      if (data?.user && !data.user.confirmed_at) {
-        toast({
-          title: "Registration successful",
-          description: "Please check your email for a confirmation link to complete your registration.",
-        });
-      } else {
-        toast({
-          title: "Registration successful",
-          description: "Your account has been created and you are now logged in.",
-        });
+      // If signup worked, immediately attempt login (Supabase might not automatically log the user in)
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      if (loginError) {
+        throw new Error("Successfully registered, but failed to log in. Please try logging in manually.");
       }
+      // Also, insert into profiles table if not already present
+      if (loginData.user) {
+        const { data: profile, error: pfError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', loginData.user.id)
+          .maybeSingle();
+        if (!profile && !pfError) {
+          await supabase.from('profiles').insert([{
+            id: loginData.user.id,
+            name: name,
+            email: email,
+            role: 'user'
+          }]);
+        }
+      }
+      toast({
+        title: "Registration successful",
+        description: "Your account has been created and you are now logged in.",
+      });
     } catch (error) {
       setIsLoading(false);
       throw error;
