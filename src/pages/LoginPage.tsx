@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -31,6 +32,7 @@ const LoginPage = () => {
   const [error, setError] = useState<string | null>(null);
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -44,9 +46,17 @@ const LoginPage = () => {
     try {
       setError(null);
       await login(values.email, values.password);
+      toast({
+        title: "Login Successful",
+        description: "Welcome back to E-Certify!",
+      });
       navigate("/");
     } catch (err) {
-      setError("Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123");
+      }
     }
   };
 

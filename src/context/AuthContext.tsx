@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, AuthContextType } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 interface Profile {
   id: string;
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { toast } = useToast();
 
   // Fetch user profile from "profiles" table
   const fetchProfile = async (userId: string) => {
@@ -75,9 +77,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Login method using Supabase
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please confirm your email address before logging in. Check your inbox for a confirmation link.');
+        } else if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123');
+        } else {
+          throw new Error(error.message || 'Login failed');
+        }
+      }
+      
+      // If we have a successful login but no data, something went wrong
+      if (!data.user) {
+        throw new Error('Failed to retrieve user information');
+      }
+
+      toast({
+        title: "Login successful",
+        description: `Welcome back, ${data.user.email}!`,
+      });
+    } catch (error) {
+      setIsLoading(false);
+      throw error; // Propagate error to the component for display
+    }
     setIsLoading(false);
-    if (error) throw new Error(error.message ?? 'Login failed');
   };
 
   // Logout method using Supabase
@@ -86,23 +112,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signOut();
     setUser(null);
     setIsLoading(false);
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out.",
+    });
   };
 
   // Register method using Supabase (sign-up and create profile)
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name } }
-    });
-    setIsLoading(false);
-    if (error) throw new Error(error.message ?? 'Registration failed');
-    // Wait for email confirmation, then login
-    if (data.user) {
-      // Optionally force email confirmation here
-      return;
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } }
+      });
+      
+      if (error) {
+        throw new Error(error.message || 'Registration failed');
+      }
+      
+      // Check if email confirmation is required
+      if (data?.user && !data.user.confirmed_at) {
+        toast({
+          title: "Registration successful",
+          description: "Please check your email for a confirmation link to complete your registration.",
+        });
+      } else {
+        toast({
+          title: "Registration successful",
+          description: "Your account has been created and you are now logged in.",
+        });
+      }
+    } catch (error) {
+      setIsLoading(false);
+      throw error;
     }
+    setIsLoading(false);
   };
 
   return (

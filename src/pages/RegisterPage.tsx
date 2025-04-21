@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -37,6 +38,7 @@ const RegisterPage = () => {
   const [error, setError] = useState<string | null>(null);
   const { register, isLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -52,7 +54,11 @@ const RegisterPage = () => {
     try {
       setError(null);
       await register(values.name, values.email, values.password);
-      navigate("/");
+      toast({
+        title: "Registration Successful",
+        description: "Please check your email for a verification link to complete your registration.",
+      });
+      navigate("/login");
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
