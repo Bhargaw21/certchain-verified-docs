@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -46,10 +45,6 @@ const LoginPage = () => {
     try {
       setError(null);
       await login(values.email, values.password);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back to E-Certify!",
-      });
       navigate("/");
     } catch (err) {
       if (err instanceof Error) {

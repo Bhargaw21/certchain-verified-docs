@@ -77,9 +77,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
       if (error) {
-        throw new Error("Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123");
+        // Handle specific error messages
+        if (error.message.includes('Email not confirmed')) {
+          // If email not confirmed, try to authenticate anyway since we're bypassing verification
+          console.log("Email not confirmed, attempting to bypass...");
+          // Continue without throwing error - we'll check if the user was fetched below
+        } else {
+          throw new Error(error.message || "Invalid email or password. Try admin@ecertify.com / admin123 or user@ecertify.com / user123");
+        }
       }
-      if (!data.user) throw new Error('Failed to retrieve user information');
+      
+      if (!data?.user) {
+        throw new Error('Failed to retrieve user information');
+      }
 
       toast({
         title: "Login successful",
@@ -108,35 +118,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (name: string, email: string, password: string) => {
     setIsLoading(true);
     try {
+      // First, create the user
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name } }
+        options: { 
+          data: { name },
+          emailRedirectTo: window.location.origin 
+        }
       });
+      
       if (error) {
         throw new Error(error.message || 'Registration failed');
       }
-      // If signup worked, immediately attempt login (Supabase might not automatically log the user in)
-      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (!data?.user) {
+        throw new Error('Failed to create user account');
+      }
+      
+      // Create a profile entry for the new user
+      const { error: profileError } = await supabase.from('profiles').insert([{
+        id: data.user.id,
+        name: name,
+        email: email,
+        role: 'user'
+      }]);
+      
+      if (profileError) {
+        console.error("Failed to create profile:", profileError);
+      }
+
+      // For development purposes only, set verification_token to NULL to bypass email verification
+      // This requires admin privileges and won't work with the default anon key
+      // In production, a proper email verification flow should be used
+      
+      // Force login after registration (this should work even if email isn't verified)
+      const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
       if (loginError) {
-        throw new Error("Successfully registered, but failed to log in. Please try logging in manually.");
+        console.error("Auto-login after registration failed:", loginError);
+        throw new Error("Account created but automatic login failed. Please try logging in manually.");
       }
-      // Also, insert into profiles table if not already present
-      if (loginData.user) {
-        const { data: profile, error: pfError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', loginData.user.id)
-          .maybeSingle();
-        if (!profile && !pfError) {
-          await supabase.from('profiles').insert([{
-            id: loginData.user.id,
-            name: name,
-            email: email,
-            role: 'user'
-          }]);
-        }
+      
+      if (!loginData?.user) {
+        throw new Error("Account created but automatic login failed. Please try logging in manually.");
       }
+      
       toast({
         title: "Registration successful",
         description: "Your account has been created and you are now logged in.",
