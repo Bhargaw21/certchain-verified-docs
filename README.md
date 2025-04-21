@@ -1,73 +1,95 @@
-# Welcome to your Lovable project
+# E-Certify: Blockchain-Verified Certificate Platform
 
-## Project info
+E-Certify is a full-stack web application for creating, issuing, and verifying digital certificates using blockchain technology. The platform ensures certificate authenticity through Ethereum blockchain verification.
 
-**URL**: https://lovable.dev/projects/9fe48a2c-d3cb-4067-879e-5ae0b6984662
+## 🔑 Key Features
 
-## How can I edit this code?
+- **Secure Authentication**: Role-based access for admins and regular users
+- **Certificate Generation**: Create and customize digital certificates
+- **Blockchain Verification**: Store certificate hashes on Ethereum for immutable verification
+- **QR Code Integration**: Each certificate includes a unique QR code for easy verification
+- **Responsive Design**: Modern UI that works on all devices
 
-There are several ways of editing your application.
+## 👥 User Roles
 
-**Use Lovable**
+- **Admin**: Generate and issue new certificates
+- **User**: Verify certificates using QR codes or certificate IDs
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9fe48a2c-d3cb-4067-879e-5ae0b6984662) and start prompting.
+## 🚀 Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js
+- npm or yarn
+- Ethereum wallet (for blockchain interaction)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone <repository-url>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to the project directory
+cd e-certify
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Usage
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Demo Accounts
 
-**Use GitHub Codespaces**
+For testing purposes, you can use the following demo accounts:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- **Admin**: admin@ecertify.com / admin123
+- **User**: user@ecertify.com / user123
 
-## What technologies are used for this project?
+### Verifying Certificates
 
-This project is built with:
+1. Navigate to the "Verify Certificate" page
+2. Scan the QR code on a certificate or enter the certificate ID
+3. View the verification status and certificate details
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Issuing Certificates (Admin Only)
 
-## How can I deploy this project?
+1. Log in as an admin
+2. Go to the Admin Dashboard
+3. Click "Issue New Certificate"
+4. Fill out the certificate details and submit
 
-Simply open [Lovable](https://lovable.dev/projects/9fe48a2c-d3cb-4067-879e-5ae0b6984662) and click on Share -> Publish.
+## 🔗 Blockchain Integration
 
-## Can I connect a custom domain to my Lovable project?
+The platform uses Ethereum smart contracts to store and verify certificate hashes:
 
-Yes, you can!
+- Certificate data is hashed using SHA-256
+- Hashes are stored on the Ethereum blockchain
+- Verification checks the hash against the blockchain record
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🛠️ Tech Stack
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Smart Contracts**: Solidity (Ethereum)
+- **Blockchain Integration**: ethers.js
+- **Authentication**: JWT-based
+- **PDF Generation**: react-pdf
+- **QR Code**: qrcode.react
+
+## 📱 Pages
+
+- **Home**: Landing page with platform overview
+- **Login/Register**: Authentication pages
+- **Admin Dashboard**: Certificate issuance and management
+- **Certificate Viewer**: Detailed certificate view with verification status
+- **Verification**: QR code scanning and certificate verification
+
+## 🧪 Future Enhancements
+
+- Actual blockchain integration with Ethereum testnet (Goerli/Mumbai)
+- Email notifications for certificate issuance
+- Certificate revocation functionality
+- Batch certificate issuance
+- Integration with educational institution APIs

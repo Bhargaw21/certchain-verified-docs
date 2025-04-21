@@ -52,6 +52,16 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
+                // E-Certify custom colors
+                certify: {
+                    purple: '#9b87f5',
+                    purpleDark: '#7E69AB',
+                    dark: '#1A1F2C',
+                    gray: '#8E9196',
+                    grayMedium: '#8A898C',
+                    grayLight: '#F1F1F1',
+                    accent: '#8B5CF6',
+                },
 				sidebar: {
 					DEFAULT: 'hsl(var(--sidebar-background))',
 					foreground: 'hsl(var(--sidebar-foreground))',
