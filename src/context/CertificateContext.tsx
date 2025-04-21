@@ -1,95 +1,100 @@
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Certificate } from '@/types';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from './AuthContext';
 
-// Sample certificates data
-const MOCK_CERTIFICATES: Certificate[] = [
-  {
-    id: '1',
-    title: 'Blockchain Developer Certification',
-    recipientName: 'John Doe',
-    recipientEmail: 'john@example.com',
-    issueDate: '2023-04-15',
-    issuerName: 'Blockchain Academy',
-    description: 'This certifies that John Doe has successfully completed the Blockchain Developer course.',
-    hash: '0x7b5d8c69a9e1f6d8e5b4c3d2a1b0f9e8d7c6b5a4',
-    transactionId: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
-    verified: true,
-    qrCodeId: 'cert-1',
-    template: 'professional',
-  },
-  {
-    id: '2',
-    title: 'Smart Contract Security Expert',
-    recipientName: 'Jane Smith',
-    recipientEmail: 'jane@example.com',
-    issueDate: '2023-06-22',
-    issuerName: 'Security Solutions Inc.',
-    description: 'This certifies that Jane Smith has demonstrated expertise in Smart Contract Security.',
-    hash: '0x8c7b6a5d4e3f2c1b0a9d8e7f6a5b4c3d2e1f0a9b',
-    transactionId: '0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
-    verified: true,
-    qrCodeId: 'cert-2',
-    template: 'standard',
-  }
-];
-
-// Define context type
+// Type for context
 interface CertificateContextType {
   certificates: Certificate[];
   isLoading: boolean;
-  addCertificate: (certificate: Omit<Certificate, 'id' | 'hash' | 'transactionId' | 'verified' | 'qrCodeId'>) => Promise<Certificate>;
+  addCertificate: (
+    certificate: Omit<Certificate, 'id' | 'hash' | 'transactionId' | 'verified' | 'qrCodeId'>
+  ) => Promise<Certificate>;
   getCertificate: (id: string) => Certificate | undefined;
   verifyCertificate: (id: string) => Promise<boolean>;
 }
 
-// Create context
 const CertificateContext = createContext<CertificateContextType | undefined>(undefined);
 
-export const CertificateProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [certificates, setCertificates] = useState<Certificate[]>(MOCK_CERTIFICATES);
+export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const addCertificate = async (certificateData: Omit<Certificate, 'id' | 'hash' | 'transactionId' | 'verified' | 'qrCodeId'>) => {
+  // Load certificates on mount (admin: all; user: own only)
+  useEffect(() => {
+    async function fetchCertificates() {
+      if (!user) {
+        setCertificates([]);
+        return;
+      }
+      setIsLoading(true);
+      let query = supabase.from('certificates').select('*');
+      // Admin: view all, User: view only their own
+      if (user.role === 'user') query = query.eq('user_id', user.id);
+      // For admin (thanks to RLS), get all
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (!error && data) setCertificates(data as Certificate[]);
+      setIsLoading(false);
+    }
+    fetchCertificates();
+  }, [user]);
+
+  // Add certificate (admins only)
+  const addCertificate = async (
+    certData: Omit<Certificate, 'id' | 'hash' | 'transactionId' | 'verified' | 'qrCodeId'>
+  ): Promise<Certificate> => {
     setIsLoading(true);
-    
-    // Simulate API call and blockchain transaction
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Generate a unique ID and QR code ID
-    const id = `cert-${Date.now()}`;
-    const qrCodeId = `qr-${Date.now()}`;
-    
-    // Create a new certificate with a mock hash and transaction ID
-    const newCertificate: Certificate = {
-      ...certificateData,
-      id,
-      qrCodeId,
-      hash: `0x${Math.random().toString(16).substring(2, 42)}`,
-      transactionId: `0x${Math.random().toString(16).substring(2, 66)}`,
-      verified: true,
-    };
-    
-    setCertificates(prev => [...prev, newCertificate]);
+    // Generate a random string for qrCodeId
+    const qrCodeId = `qr-${Math.random().toString(36).substring(2, 12)}`;
+    const hash = Math.random().toString(36).substring(2, 42); // Placeholders for now
+    const transactionId = Math.random().toString(36).substring(2, 66);
+
+    // Insert certificate
+    const { data, error } = await supabase.from('certificates').insert([
+      {
+        ...certData,
+        qr_code_id: qrCodeId,
+        hash,
+        transaction_id: transactionId,
+        verified: true,
+        user_id: user?.id,
+      },
+    ])
+    .select()
+    .single();
+
     setIsLoading(false);
-    
-    return newCertificate;
+    if (error || !data) throw new Error(error?.message || 'Failed to insert certificate');
+    setCertificates(prev => [data as Certificate, ...prev]);
+    return data as Certificate;
   };
 
+  // Get single certificate by id or qrCodeId
   const getCertificate = (id: string) => {
-    return certificates.find(cert => cert.id === id || cert.qrCodeId === id);
+    return certificates.find(
+      cert => cert.id === id || cert.qrCodeId === id || cert.qr_code_id === id
+    );
   };
 
-  const verifyCertificate = async (id: string) => {
+  // Verify certificate: check if it's present (locally), and its "verified" field (simulate blockchain for demo)
+  const verifyCertificate = async (id: string): Promise<boolean> => {
     setIsLoading(true);
-    
-    // Simulate API call and blockchain verification
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const certificate = getCertificate(id);
+    // Try local first
+    let cert = certificates.find(
+      cert => cert.id === id || cert.qrCodeId === id || cert.qr_code_id === id
+    );
+    // If not found, try fetch
+    if (!cert) {
+      const { data, error } = await supabase
+        .from('certificates')
+        .select('*')
+        .or(`id.eq.${id},qr_code_id.eq.${id}`);
+      cert = data && data.length > 0 ? (data[0] as Certificate) : undefined;
+    }
     setIsLoading(false);
-    
-    return !!certificate?.verified;
+    return Boolean(cert?.verified);
   };
 
   return (
@@ -107,11 +112,8 @@ export const CertificateProvider: React.FC<{ children: React.ReactNode }> = ({ c
   );
 };
 
-// Custom hook to use the certificate context
 export const useCertificates = () => {
-  const context = useContext(CertificateContext);
-  if (context === undefined) {
-    throw new Error('useCertificates must be used within a CertificateProvider');
-  }
-  return context;
+  const ctx = useContext(CertificateContext);
+  if (!ctx) throw new Error('useCertificates must be used within a CertificateProvider');
+  return ctx;
 };
