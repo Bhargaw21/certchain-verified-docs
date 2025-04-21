@@ -15,6 +15,54 @@ interface CertificateContextType {
   verifyCertificate: (id: string) => Promise<boolean>;
 }
 
+// Interface matching Supabase database schema (snake_case)
+interface SupabaseCertificate {
+  id: string;
+  title: string;
+  recipient_name: string;
+  recipient_email: string;
+  issue_date: string;
+  expiry_date?: string;
+  issuer_name: string;
+  description: string;
+  hash?: string;
+  transaction_id?: string;
+  verified?: boolean;
+  qr_code_id: string;
+  template: 'standard' | 'professional' | 'academic';
+  user_id?: string;
+  created_at: string;
+}
+
+// Convert from DB format to frontend format
+const mapToCertificate = (dbCert: SupabaseCertificate): Certificate => ({
+  id: dbCert.id,
+  title: dbCert.title,
+  recipientName: dbCert.recipient_name,
+  recipientEmail: dbCert.recipient_email,
+  issueDate: dbCert.issue_date,
+  expiryDate: dbCert.expiry_date,
+  issuerName: dbCert.issuer_name,
+  description: dbCert.description,
+  hash: dbCert.hash,
+  transactionId: dbCert.transaction_id,
+  verified: dbCert.verified || false,
+  qrCodeId: dbCert.qr_code_id,
+  template: dbCert.template
+});
+
+// Convert from frontend format to DB format
+const mapToDbCertificate = (cert: Omit<Certificate, 'id' | 'hash' | 'transactionId' | 'verified' | 'qrCodeId'>) => ({
+  title: cert.title,
+  recipient_name: cert.recipientName,
+  recipient_email: cert.recipientEmail,
+  issue_date: cert.issueDate,
+  expiry_date: cert.expiryDate,
+  issuer_name: cert.issuerName,
+  description: cert.description,
+  template: cert.template
+});
+
 const CertificateContext = createContext<CertificateContextType | undefined>(undefined);
 
 export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -35,7 +83,10 @@ export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ childre
       if (user.role === 'user') query = query.eq('user_id', user.id);
       // For admin (thanks to RLS), get all
       const { data, error } = await query.order('created_at', { ascending: false });
-      if (!error && data) setCertificates(data as Certificate[]);
+      if (!error && data) {
+        const mappedCertificates = (data as SupabaseCertificate[]).map(mapToCertificate);
+        setCertificates(mappedCertificates);
+      }
       setIsLoading(false);
     }
     fetchCertificates();
@@ -51,10 +102,13 @@ export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ childre
     const hash = Math.random().toString(36).substring(2, 42); // Placeholders for now
     const transactionId = Math.random().toString(36).substring(2, 66);
 
+    // Convert frontend data to database format
+    const dbCertData = mapToDbCertificate(certData);
+
     // Insert certificate
     const { data, error } = await supabase.from('certificates').insert([
       {
-        ...certData,
+        ...dbCertData,
         qr_code_id: qrCodeId,
         hash,
         transaction_id: transactionId,
@@ -67,14 +121,17 @@ export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     setIsLoading(false);
     if (error || !data) throw new Error(error?.message || 'Failed to insert certificate');
-    setCertificates(prev => [data as Certificate, ...prev]);
-    return data as Certificate;
+    
+    // Convert back to frontend format
+    const newCertificate = mapToCertificate(data as SupabaseCertificate);
+    setCertificates(prev => [newCertificate, ...prev]);
+    return newCertificate;
   };
 
   // Get single certificate by id or qrCodeId
   const getCertificate = (id: string) => {
     return certificates.find(
-      cert => cert.id === id || cert.qrCodeId === id || cert.qr_code_id === id
+      cert => cert.id === id || cert.qrCodeId === id
     );
   };
 
@@ -83,7 +140,7 @@ export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ childre
     setIsLoading(true);
     // Try local first
     let cert = certificates.find(
-      cert => cert.id === id || cert.qrCodeId === id || cert.qr_code_id === id
+      cert => cert.id === id || cert.qrCodeId === id
     );
     // If not found, try fetch
     if (!cert) {
@@ -91,7 +148,10 @@ export const CertificateProvider: React.FC<{ children: ReactNode }> = ({ childre
         .from('certificates')
         .select('*')
         .or(`id.eq.${id},qr_code_id.eq.${id}`);
-      cert = data && data.length > 0 ? (data[0] as Certificate) : undefined;
+      
+      if (data && data.length > 0) {
+        cert = mapToCertificate(data[0] as SupabaseCertificate);
+      }
     }
     setIsLoading(false);
     return Boolean(cert?.verified);
